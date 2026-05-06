@@ -167,7 +167,7 @@ if archivo_gpx is not None:
                 bbox=dict(boxstyle='circle,pad=0.3', fc='black', ec='none', alpha=0.7))
 
     ax.fill_between(dists_acum, elev, color='gray', alpha=0.1)
-    ax.set_title("Perfil de Ruta (Tramos Claramente Numerados)")
+    ax.set_title("Perfil de Ruta")
     ax.set_xlabel("Distancia (km)")
     ax.set_ylabel("Elevación (m)")
     ax.grid(True, linestyle='--', alpha=0.6)
