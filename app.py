@@ -2,6 +2,7 @@ import streamlit as st
 import gpxpy
 import matplotlib.pyplot as plt
 import datetime
+import io
 
 # --- FUNCIONES BASE ---
 def calculate_time(tramo_dist_km, tramo_desnivel_m, tramo_type, v_plano, v_subida, v_bajada):
@@ -135,6 +136,7 @@ if archivo_gpx is not None:
     
     st.success(f"**Tiempo total:** {format_hours(total_hours)} | **Llegada estimada:** {llegada_h:02d}:{llegada_m:02d}")
 
+    # --- GENERAR GRÁFICA ---
     elev = [p.elevation for p in puntos]
     dists_acum = [0.0]
     for i in range(1, len(puntos)):
@@ -143,9 +145,15 @@ if archivo_gpx is not None:
     fig, ax = plt.subplots(figsize=(12, 4))
     colores = {'subida': 'red', 'bajada': 'green', 'llano': 'blue'}
     
-    for seg in tramos:
+    for idx, seg in enumerate(tramos):
         inicio, fin = seg['start_point_index'], seg['end_point_index']
         ax.plot(dists_acum[inicio:fin+1], elev[inicio:fin+1], color=colores[seg['type']], linewidth=2)
+        
+        # Añadir número de tramo
+        medio_idx = (inicio + fin) // 2
+        ax.text(dists_acum[medio_idx], elev[medio_idx] + 30, str(idx + 1), 
+                color='white', fontsize=10, fontweight='bold', ha='center', va='center',
+                bbox=dict(boxstyle='circle,pad=0.3', fc='black', ec='none', alpha=0.7))
 
     ax.fill_between(dists_acum, elev, color='gray', alpha=0.1)
     ax.set_title("Perfil de Ruta")
@@ -154,3 +162,15 @@ if archivo_gpx is not None:
     ax.grid(True, linestyle='--', alpha=0.6)
     
     st.pyplot(fig)
+    
+    # --- BOTÓN DE DESCARGA ---
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", bbox_inches="tight")
+    buf.seek(0)
+    
+    st.download_button(
+        label="📥 Descargar gráfica",
+        data=buf,
+        file_name="perfil_rutas.png",
+        mime="image/png"
+    )
