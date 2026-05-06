@@ -177,14 +177,18 @@ if archivo_gpx is not None:
     
     st.pyplot(fig)
     
-    # --- BOTÓN DE DESCARGA ---
+    # --- BOTÓN DE DESCARGA CON NOMBRE DINÁMICO ---
     buf = io.BytesIO()
     fig.savefig(buf, format="png", bbox_inches="tight")
     buf.seek(0)
     
+    # Extraemos el nombre del archivo subido (quitando el .gpx)
+    nombre_base = archivo_gpx.name.lower().replace(".gpx", "")
+    nombre_final = f"perfil_{nombre_base}.png"
+    
     st.download_button(
-        label="📥 Descargar gráfica",
+        label=f"📥 Descargar gráfica ({nombre_final})",
         data=buf,
-        file_name="perfil_rutas.png",
+        file_name=nombre_final,
         mime="image/png"
     )
