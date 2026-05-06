@@ -187,7 +187,7 @@ if archivo_gpx is not None:
     nombre_final = f"perfil_{nombre_base}.png"
     
     st.download_button(
-        label=f"📥 Descargar gráfica ({nombre_final})",
+        label=f"📥 Descargar gráfica",
         data=buf,
         file_name=nombre_final,
         mime="image/png"
