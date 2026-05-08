@@ -4,7 +4,16 @@ import matplotlib.pyplot as plt
 import datetime
 import io
 
-# --- FUNCIONES BASE ---
+# --- 1. BASE DE DATOS DE LA TABLA ---
+DATOS_RAMAS = {
+    "Colonia": {"muy baja": [2.4, 200, 360], "baja": [2.7, 225, 405], "media": [3.0, 250, 450], "alta": [3.15, 263, 473], "muy alta": [3.3, 275, 495]},
+    "Manada": {"muy baja": [2.6, 240, 400], "baja": [2.93, 270, 450], "media": [3.25, 300, 500], "alta": [3.41, 315, 525], "muy alta": [3.58, 330, 550]},
+    "Tropa": {"muy baja": [2.8, 280, 440], "baja": [3.15, 315, 495], "media": [3.5, 350, 550], "alta": [3.68, 368, 578], "muy alta": [3.85, 385, 605]},
+    "Escultas": {"muy baja": [3.2, 320, 480], "baja": [3.6, 360, 540], "media": [4.0, 400, 600], "alta": [4.2, 420, 630], "muy alta": [4.4, 440, 660]},
+    "Clan": {"muy baja": [3.2, 320, 480], "baja": [3.6, 360, 540], "media": [4.0, 400, 600], "alta": [4.2, 420, 630], "muy alta": [4.4, 440, 660]}
+}
+
+# --- 2. FUNCIONES ORIGINALES (SEGMENTACIÓN FIABLE) ---
 def calculate_time(tramo_dist_km, tramo_desnivel_m, tramo_type, v_plano, v_subida, v_bajada):
     tiempo_llano = tramo_dist_km / v_plano if v_plano > 0 else 0
     if tramo_type == 'subida': tiempo_desnivel = tramo_desnivel_m / v_subida
@@ -33,7 +42,6 @@ def segmentar_ruta_precisa(puntos, dist_minima_km):
                 i_futuro += 1
             des_act = puntos[j].elevation - puntos[i_inicio].elevation
             des_fut = puntos[i_futuro].elevation - puntos[j].elevation
-            
             if des_act > 5 and des_fut < -5:
                 elevaciones = [p.elevation for p in puntos[i_inicio:j+1]]
                 i_fin = i_inicio + elevaciones.index(max(elevaciones))
@@ -45,11 +53,7 @@ def segmentar_ruta_precisa(puntos, dist_minima_km):
         
         if i_fin <= i_inicio: i_fin = len(puntos) - 1
         des_tot = puntos[i_fin].elevation - puntos[i_inicio].elevation
-        
-        if des_tot > 5: tipo = 'subida'
-        elif des_tot < -5: tipo = 'bajada'
-        else: tipo = 'llano'
-        
+        tipo = 'subida' if des_tot > 5 else ('bajada' if des_tot < -5 else 'llano')
         tramos.append({'type': tipo, 'start_point_index': i_inicio, 'end_point_index': i_fin, 'dist': dists[i_fin] - dists[i_inicio], 'desnivel': des_tot})
         i_inicio = i_fin
         
@@ -67,12 +71,10 @@ def segmentar_ruta_precisa(puntos, dist_minima_km):
         return fus
 
     tramos = fusionar(tramos)
-
     while True:
         if len(tramos) <= 1: break
         idx = next((i for i, t in enumerate(tramos) if t['dist'] < dist_minima_km), -1)
         if idx == -1: break 
-        
         t_corto = tramos.pop(idx)
         if idx == 0:
             tramos[0]['dist'] += t_corto['dist']
@@ -93,17 +95,25 @@ def segmentar_ruta_precisa(puntos, dist_minima_km):
                 next_t['desnivel'] += t_corto['desnivel']
                 next_t['start_point_index'] = t_corto['start_point_index']
         tramos = fusionar(tramos)
-                
     return tramos
 
-# --- INTERFAZ WEB ---
-st.title("Generador de Dossier de Rutas Scout")
+# --- 3. INTERFAZ ---
+st.set_page_config(page_title="Generador Dossier Scout", layout="wide")
+st.title("⚜️ Generador de Dossier de Rutas")
 
-col1, col2, col3, col4 = st.columns(4)
-v_plano = col1.number_input("Vel. Llano (km/h)", value=4.0)
-v_subida = col2.number_input("Vel. Subida (m/h)", value=300.0)
-v_bajada = col3.number_input("Vel. Bajada (m/h)", value=400.0)
-dist_min = col4.number_input("Dist. Mín. (km)", value=0.3)
+# Selectores automáticos
+c1, c2 = st.columns(2)
+rama = c1.selectbox("Rama", list(DATOS_RAMAS.keys()))
+capacidad = c2.selectbox("Capacidad", ["muy baja", "baja", "media", "alta", "muy alta"], index=2)
+
+v_h, v_a, v_d = DATOS_RAMAS[rama][capacidad]
+
+# Panel lateral
+st.sidebar.header("Ajustes Manuales")
+v_plano = st.sidebar.number_input("Vel. Llano (km/h)", value=float(v_h))
+v_subida = st.sidebar.number_input("Vel. Ascenso (m/h)", value=float(v_a))
+v_bajada = st.sidebar.number_input("Vel. Descenso (m/h)", value=float(v_d))
+dist_min = st.sidebar.number_input("Distancia Mín. (km)", value=0.3)
 
 hora_salida = st.time_input("Hora de salida", datetime.time(9, 0))
 archivo_gpx = st.file_uploader("Sube tu archivo .gpx", type=["gpx"])
@@ -113,30 +123,7 @@ if archivo_gpx is not None:
     puntos = gpx.tracks[0].segments[0].points
     tramos = segmentar_ruta_precisa(puntos, dist_min)
     
-    total_hours = 0
-    st.subheader("Datos para el Dossier")
-    
-    for idx, seg in enumerate(tramos):
-        time_h = calculate_time(seg['dist'], seg['desnivel'], seg['type'], v_plano, v_subida, v_bajada)
-        total_hours += time_h
-        
-        pref = "+" if seg['desnivel'] > 0 else ""
-        tipo = "(Subida)" if seg['desnivel'] > 0 else "(Bajada)"
-        if seg['type'] == 'llano': tipo = "(Llano)"
-        
-        st.markdown(f"**Tramo {idx + 1}** \n"
-                    f"· Kilómetros: {seg['dist']:.2f} km  \n"
-                    f"· Desnivel total: {pref}{seg['desnivel']:.1f} m {tipo}  \n"
-                    f"· Horas en ruta: {format_hours(time_h)}")
-
-    tiempo_salida = datetime.timedelta(hours=hora_salida.hour, minutes=hora_salida.minute)
-    tiempo_llegada = tiempo_salida + datetime.timedelta(hours=total_hours)
-    llegada_h, rem = divmod(tiempo_llegada.seconds, 3600)
-    llegada_m, _ = divmod(rem, 60)
-    
-    st.success(f"**Tiempo total:** {format_hours(total_hours)} | **Llegada estimada:** {llegada_h:02d}:{llegada_m:02d}")
-
-    # --- GENERAR GRÁFICA CON ETIQUETAS MEJORADAS ---
+    # --- GENERAR GRÁFICA ---
     elev = [p.elevation for p in puntos]
     dists_acum = [0.0]
     for i in range(1, len(puntos)):
@@ -144,51 +131,52 @@ if archivo_gpx is not None:
         
     fig, ax = plt.subplots(figsize=(12, 4))
     colores = {'subida': 'red', 'bajada': 'green', 'llano': 'blue'}
-    
-    # 1. Encontrar el rango total de elevación para calcular un offset dinámico
-    min_elev = min(elev)
-    max_elev = max(elev)
-    rango_elev = max_elev - min_elev
-    # Usaremos el 10% del rango total como offset para la etiqueta
-    offset_etiqueta_dinamico = rango_elev * 0.10 
+    rango_elev = max(elev) - min(elev)
+    offset = rango_elev * 0.10 
 
     for idx, seg in enumerate(tramos):
         inicio, fin = seg['start_point_index'], seg['end_point_index']
         ax.plot(dists_acum[inicio:fin+1], elev[inicio:fin+1], color=colores[seg['type']], linewidth=2)
-        
-        # 2. Calcular punto medio y añadir número de tramo con offset dinámico y mejor alineación
         medio_idx = (inicio + fin) // 2
-        
-        # Explicación de los cambios en ax.text:
-        # y: elev[medio_idx] + offset_etiqueta_dinamico (Offset proporcional, no fijo)
-        # va: 'bottom' (La base del círculo estará en el punto offset, asegurando la separación)
-        ax.text(dists_acum[medio_idx], elev[medio_idx] + offset_etiqueta_dinamico, str(idx + 1), 
+        ax.text(dists_acum[medio_idx], elev[medio_idx] + offset, str(idx + 1), 
                 color='white', fontsize=10, fontweight='bold', ha='center', va='bottom',
                 bbox=dict(boxstyle='circle,pad=0.3', fc='black', ec='none', alpha=0.7))
 
     ax.fill_between(dists_acum, elev, color='gray', alpha=0.1)
-    ax.set_title("Perfil de Ruta")
+    ax.set_title(f"Perfil de Ruta: {rama} ({capacidad})")
     ax.set_xlabel("Distancia (km)")
     ax.set_ylabel("Elevación (m)")
     ax.grid(True, linestyle='--', alpha=0.6)
-    
-    # 3. Ajustar márgenes para que las nuevas etiquetas altas no se corten
     plt.tight_layout()
     
     st.pyplot(fig)
-    
-    # --- BOTÓN DE DESCARGA CON NOMBRE DINÁMICO ---
+
+    # --- BOTÓN DE DESCARGA (AÑADIDO) ---
     buf = io.BytesIO()
     fig.savefig(buf, format="png", bbox_inches="tight")
     buf.seek(0)
-    
-    # Extraemos el nombre del archivo subido (quitando el .gpx)
-    nombre_base = archivo_gpx.name.lower().replace(".gpx", "")
-    nombre_final = f"perfil_{nombre_base}.png"
+    nombre_img = f"perfil_{archivo_gpx.name.replace('.gpx', '')}.png"
     
     st.download_button(
-        label=f"📥 Descargar gráfica",
+        label="📥 Descargar gráfica de perfil",
         data=buf,
-        file_name=nombre_final,
+        file_name=nombre_img,
         mime="image/png"
     )
+
+    # --- TABLA DE DATOS ---
+    total_hours = 0
+    st.divider()
+    for idx, seg in enumerate(tramos):
+        time_h = calculate_time(seg['dist'], seg['desnivel'], seg['type'], v_plano, v_subida, v_bajada)
+        total_hours += time_h
+        pref = "+" if seg['desnivel'] > 0 else ""
+        tipo = "(Subida)" if seg['type'] == 'subida' else ("(Bajada)" if seg['type'] == 'bajada' else "(Llano)")
+        st.write(f"**Tramo {idx+1}** {tipo} | Distancia: {seg['dist']:.2f}km | Desnivel: {pref}{seg['desnivel']:.1f}m | Tiempo: {format_hours(time_h)}")
+
+    # Horarios finales
+    t_salida = datetime.timedelta(hours=hora_salida.hour, minutes=hora_salida.minute)
+    t_llegada = t_salida + datetime.timedelta(hours=total_hours)
+    llegada_h, rem = divmod(t_llegada.seconds, 3600)
+    llegada_m, _ = divmod(rem, 60)
+    st.success(f"**Tiempo total en ruta:** {format_hours(total_hours)} | **Llegada estimada:** {llegada_h:02d}:{llegada_m:02d}")
