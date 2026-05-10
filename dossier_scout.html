@@ -71,7 +71,7 @@
         
         .resumen { background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); padding: 20px; border-radius: 12px; color: #065f46; text-align: center; margin-top: 24px; border: 1px solid #86efac; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.1);}
         .resumen .total { font-weight: 800; font-size: 1.25rem; margin-bottom: 6px; display: flex; align-items: center; justify-content: center; gap: 8px;}
-        .resumen .llegada { font-size: 0.95rem; font-weight: 600; opacity: 0.9;}
+        .resumen .llegada { font-size: 0.95rem; font-weight: 600; opacity: 0.9; margin-bottom: 4px;}
         
         #grafica { margin-top: 24px; width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); display: none; background: #fff; padding: 15px 0;}
         #grafica img { max-width: 100%; height: auto; display: block; margin: 0 auto;}
@@ -149,7 +149,6 @@
 </py-config>
 
 <script>
-    // BASE DE DATOS EXACTA
     const BASE = {
         "Colonia": {h: 3, a: 250, d: 450},
         "Manada": {h: 3.25, a: 300, d: 500},
@@ -330,10 +329,12 @@ async def procesar(event):
 
         html_out = ""
         total_hours = 0
+        total_km = 0
 
         for idx, seg in enumerate(tramos):
             time_h = calculate_time(seg['dist'], seg['desnivel'], seg['type'], v_plano, v_subida, v_bajada, d_min, d_frec)
             total_hours += time_h
+            total_km += seg['dist']
             pref = "+" if seg['desnivel'] > 0 else ""
             tipo = "(Subida)" if seg['type'] == 'subida' else ("(Bajada)" if seg['type'] == 'bajada' else "(Llano)")
             
@@ -351,6 +352,7 @@ async def procesar(event):
         html_out += f"""
         <div class='resumen'>
             <div class='total'>⏱️ Tiempo Total: {format_hours(total_hours)}</div>
+            <div class='llegada' style='margin-top: 8px;'>📏 Distancia Total: {total_km:.2f} km</div>
             <div class='llegada'>🏁 Llegada Estimada: {llegada_h:02d}:{llegada_m:02d}</div>
         </div>"""
         
