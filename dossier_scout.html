@@ -273,13 +273,8 @@
         }
 
         @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            100% {
-                transform: rotate(360deg);
-            }
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
         #resultados {
@@ -369,11 +364,70 @@
             display: block;
             margin: 0 auto;
         }
+
+        .dist-min-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .dist-min-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .dist-min-header label {
+            margin: 0;
+        }
+
+        .auto-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            user-select: none;
+        }
+
+        .auto-toggle input[type="checkbox"] {
+            width: 14px;
+            height: 14px;
+            accent-color: var(--primary);
+            cursor: pointer;
+            margin: 0;
+            padding: 0;
+            border: none;
+            border-radius: 0;
+            background: none;
+            box-shadow: none;
+        }
+
+        .auto-toggle input[type="checkbox"]:focus {
+            outline: none;
+            box-shadow: none;
+            border-color: transparent;
+        }
+
+        #dist_min_info {
+            font-size: 0.78rem;
+            color: var(--primary);
+            font-weight: 600;
+            font-style: italic;
+            display: none;
+            padding: 6px 10px;
+            background: #f0fdf4;
+            border-radius: 6px;
+            border: 1px solid #bbf7d0;
+        }
     </style>
 </head>
 
 <body>
-
     <div class="container">
         <div class="card">
             <div class="header">
@@ -417,24 +471,29 @@
             <details>
                 <summary>Ajustes Manuales de Velocidad</summary>
                 <div class="grid" style="margin-top: 16px; margin-bottom: 0;">
-                    <div class="input-group"><label>Llano (km/h)</label><input type="number" id="v_plano" value="4.0"
-                            step="0.1"></div>
-                    <div class="input-group"><label>Subida (m/h)</label><input type="number" id="v_subida" value="400">
+                    <div class="input-group"><label>Llano (km/h)</label><input type="number" id="v_plano" value="4.0" step="0.1"></div>
+                    <div class="input-group"><label>Subida (m/h)</label><input type="number" id="v_subida" value="400"></div>
+                    <div class="input-group"><label>Bajada (m/h)</label><input type="number" id="v_bajada" value="600"></div>
+                    <div class="dist-min-wrapper">
+                        <div class="dist-min-header">
+                            <label for="dist_min">Dist. Mín Tramo (km)</label>
+                            <label class="auto-toggle" title="Calcular automáticamente según la longitud de la ruta">
+                                <input type="checkbox" id="dist_auto" checked onchange="toggleAutoMin()">
+                                Auto
+                            </label>
+                        </div>
+                        <input type="number" id="dist_min" value="0.3" step="0.05" disabled style="opacity: 0.5;">
+                        <div id="dist_min_info">Se calculará al cargar el GPX</div>
                     </div>
-                    <div class="input-group"><label>Bajada (m/h)</label><input type="number" id="v_bajada" value="600">
-                    </div>
-                    <div class="input-group"><label>Dist. Mín Tramo (km)</label><input type="number" id="dist_min"
-                            value="0.3" step="0.1"></div>
                 </div>
             </details>
 
             <div class="grid" style="grid-template-columns: 0.8fr 1.2fr;">
-                <div class="input-group"><label>Hora Salida</label><input type="time" id="hora_salida" value="09:00">
-                </div>
-                <div class="input-group"><label>Archivo GPX</label><input type="file" id="gpx_file" accept=".gpx"></div>
+                <div class="input-group"><label>Hora Salida</label><input type="time" id="hora_salida" value="09:00"></div>
+                <div class="input-group"><label>Archivo GPX</label><input type="file" id="gpx_file" accept=".gpx" onchange="onGpxChange(this)"></div>
             </div>
 
-            <button id="btn_calc" class="btn" py-click="procesar">⛰️ Generar Dossier</button>
+            <button id="btn_calc" class="btn" py-click="procesar" disabled style="opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none;">⛰️ Generar Dossier</button>
             <button id="btn_download" class="btn btn-download" onclick="descargarImagen()">📥 Descargar Perfil</button>
 
             <div id="loading">
@@ -445,8 +504,7 @@
         <div id="grafica"></div>
         <div id="resultados"></div>
         <div style="text-align: center; margin-top: 20px; padding: 15px; border-top: 1px solid #e5e7eb;">
-            <a href="https://github.com/roldanoteodavid/generador-dossier-rutas" target="_blank"
-                style="text-decoration: none; color: #6b7280; font-weight: 600; font-size: 0.9rem;">
+            <a href="https://github.com/roldanoteodavid/generador-dossier-rutas" target="_blank" style="text-decoration: none; color: #6b7280; font-weight: 600; font-size: 0.9rem;">
                 💻 Repositorio en GitHub
             </a>
         </div>
@@ -478,11 +536,37 @@
             let cap = document.getElementById("capacidad").value;
             let m = MULT[cap];
             let b = BASE[rama];
-
             document.getElementById("v_plano").value = (b.h * m).toFixed(2);
             document.getElementById("v_subida").value = Math.round(b.a * m);
             document.getElementById("v_bajada").value = Math.round(b.d * m);
         }
+
+        function toggleAutoMin() {
+            const isAuto = document.getElementById("dist_auto").checked;
+            const input = document.getElementById("dist_min");
+            const info = document.getElementById("dist_min_info");
+            input.disabled = isAuto;
+            input.style.opacity = isAuto ? "0.5" : "1";
+            info.style.display = isAuto ? "block" : "none";
+        }
+
+        window.actualizarDistMinAuto = function (total_km) {
+            const isAuto = document.getElementById("dist_auto").checked;
+            if (!isAuto) return;
+            let dist_min;
+            if (total_km < 5) {
+                dist_min = Math.max(0.15, total_km * 0.04);
+            } else if (total_km <= 35) {
+                dist_min = 0.20 + (total_km - 5) * (1.20 / 30);
+            } else {
+                dist_min = 1.80;
+            }
+            dist_min = Math.round(dist_min / 0.05) * 0.05;
+            const input = document.getElementById("dist_min");
+            input.value = dist_min.toFixed(2);
+            const info = document.getElementById("dist_min_info");
+            info.textContent = `Auto: ${dist_min.toFixed(2)} km (ruta de ${total_km.toFixed(1)} km)`;
+        };
 
         window.imagenGeneradaBase64 = null;
         window.nombreArchivoOriginal = "ruta";
@@ -496,6 +580,17 @@
             a.click();
             document.body.removeChild(a);
         }
+
+        function onGpxChange(input) {
+            const btn = document.getElementById("btn_calc");
+            const hasFile = input.files && input.files.length > 0;
+            btn.disabled = !hasFile;
+            btn.style.opacity = hasFile ? "1" : "0.5";
+            btn.style.cursor = hasFile ? "pointer" : "not-allowed";
+            btn.style.boxShadow = hasFile ? "" : "none";
+        }
+
+        toggleAutoMin();
     </script>
 
     <script type="py">
@@ -509,17 +604,14 @@ from pyscript import document, display, window
 
 def calculate_time(tramo_dist_km, tramo_desnivel_m, tramo_type, v_plano, v_subida, v_bajada, d_min, d_frec):
     t_h = tramo_dist_km / v_plano if v_plano > 0 else 0
-    
     if tramo_type == 'subida': 
         t_v = tramo_desnivel_m / v_subida if v_subida > 0 else 0
     elif tramo_type == 'bajada': 
         t_v = abs(tramo_desnivel_m) / v_bajada if v_bajada > 0 else 0
     else: 
         t_v = 0
-        
     t_marcha = max(t_h, t_v) + (min(t_h, t_v) / 2)
     t_descanso = t_marcha * (d_min / d_frec) if d_frec > 0 else 0
-    
     return t_marcha + t_descanso
 
 def format_hours(hours_decimal):
@@ -527,11 +619,16 @@ def format_hours(hours_decimal):
     hours, minutes = divmod(total_minutes, 60)
     return f"{hours}h {minutes:02d}m"
 
+def calcular_distancia_total(puntos):
+    total = 0.0
+    for i in range(1, len(puntos)):
+        total += puntos[i-1].distance_2d(puntos[i]) / 1000.0
+    return total
+
 def segmentar_ruta_precisa(puntos, dist_minima_km):
     dists = [0.0]
     for i in range(1, len(puntos)):
         dists.append(dists[-1] + puntos[i-1].distance_2d(puntos[i])/1000.0)
-    
     tramos = []
     i_inicio = 0
     while i_inicio < len(puntos) - 1:
@@ -550,13 +647,11 @@ def segmentar_ruta_precisa(puntos, dist_minima_km):
                 elevaciones = [p.elevation for p in puntos[i_inicio:j+1]]
                 i_fin = i_inicio + elevaciones.index(min(elevaciones))
                 if i_fin > i_inicio: break
-        
         if i_fin <= i_inicio: i_fin = len(puntos) - 1
         des_tot = puntos[i_fin].elevation - puntos[i_inicio].elevation
         tipo = 'subida' if des_tot > 5 else ('bajada' if des_tot < -5 else 'llano')
         tramos.append({'type': tipo, 'start_point_index': i_inicio, 'end_point_index': i_fin, 'dist': dists[i_fin] - dists[i_inicio], 'desnivel': des_tot})
         i_inicio = i_fin
-        
     def fusionar(lista):
         fus = []
         if lista:
@@ -569,7 +664,6 @@ def segmentar_ruta_precisa(puntos, dist_minima_km):
                     ult['end_point_index'] = t['end_point_index']
                 else: fus.append(t.copy())
         return fus
-
     tramos = fusionar(tramos)
     while True:
         if len(tramos) <= 1: break
@@ -603,87 +697,64 @@ async def procesar(event):
     res_div = document.getElementById("resultados")
     graf_div = document.getElementById("grafica")
     btn_down = document.getElementById("btn_download")
-    
     btn.disabled = True
     btn_down.style.display = "none"
     loading.style.display = "flex"
     res_div.innerHTML = ""
     graf_div.innerHTML = ""
     graf_div.style.display = "none"
-    
     await asyncio.sleep(0.05) 
-    
     try:
         v_plano = float(document.getElementById("v_plano").value.replace(',', '.'))
         v_subida = float(document.getElementById("v_subida").value.replace(',', '.'))
         v_bajada = float(document.getElementById("v_bajada").value.replace(',', '.'))
-        dist_min = float(document.getElementById("dist_min").value.replace(',', '.'))
         d_min = float(document.getElementById("desc_min").value.replace(',', '.'))
         d_frec = float(document.getElementById("desc_frec").value.replace(',', '.'))
         h_str = document.getElementById("hora_salida").value
-
         file_list = document.getElementById('gpx_file').files
         if not file_list:
             res_div.innerHTML = "<div style='color:#dc2626; text-align:center; padding:12px; background:#fef2f2; border-radius:10px; border:1px solid #fecaca; font-weight:600;'>⚠️ Por favor, selecciona un archivo GPX primero.</div>"
             return
-
         file = file_list.item(0)
         window.nombreArchivoOriginal = file.name
         gpx_text = await file.text()
-
         gpx = gpxpy.parse(gpx_text)
         puntos = gpx.tracks[0].segments[0].points
+        total_km_previo = calcular_distancia_total(puntos)
+        window.actualizarDistMinAuto(total_km_previo)
+        dist_min = float(document.getElementById("dist_min").value.replace(',', '.'))
         tramos = segmentar_ruta_precisa(puntos, dist_min)
-
         html_out = ""
         total_hours = 0
         total_km = 0
-
         for idx, seg in enumerate(tramos):
             time_h = calculate_time(seg['dist'], seg['desnivel'], seg['type'], v_plano, v_subida, v_bajada, d_min, d_frec)
             total_hours += time_h
             total_km += seg['dist']
             pref = "+" if seg['desnivel'] > 0 else ""
             tipo = "(Subida)" if seg['type'] == 'subida' else ("(Bajada)" if seg['type'] == 'bajada' else "(Llano)")
-            
-            html_out += f"""
-            <div class='tramo-box'>
-                <div class='tramo-header'><span>T{idx+1} {tipo}</span> <span class='time'>{format_hours(time_h)}</span></div>
-                <div class='tramo-data'><span>Distancia: <b>{seg['dist']:.2f} km</b></span> <span>Desnivel: <b>{pref}{seg['desnivel']:.0f} m</b></span></div>
-            </div>"""
-
+            html_out += f"<div class='tramo-box'><div class='tramo-header'><span>T{idx+1} {tipo}</span> <span class='time'>{format_hours(time_h)}</span></div><div class='tramo-data'><span>Distancia: <b>{seg['dist']:.2f} km</b></span> <span>Desnivel: <b>{pref}{seg['desnivel']:.0f} m</b></span></div></div>"
         hora_salida = datetime.datetime.strptime(h_str, "%H:%M")
         t_llegada = hora_salida + datetime.timedelta(hours=total_hours)
         llegada_h, rem = divmod(t_llegada.hour * 3600 + t_llegada.minute * 60, 3600)
         llegada_m, _ = divmod(rem, 60)
-        
-        html_out += f"""
-        <div class='resumen'>
-            <div class='total'>⏱️ Tiempo Total: {format_hours(total_hours)}</div>
-            <div class='llegada' style='margin-top: 8px;'>📏 Distancia Total: {total_km:.2f} km</div>
-            <div class='llegada'>🏁 Llegada Estimada: {llegada_h:02d}:{llegada_m:02d}</div>
-        </div>"""
-        
+        auto_str = ""
+        if document.getElementById("dist_auto").checked:
+            auto_str = f"<div class='llegada'>🧠 Tramo mínimo auto: {dist_min:.2f} km</div>"
+        html_out += f"<div class='resumen'><div class='total'>⏱️ Tiempo Total: {format_hours(total_hours)}</div><div class='llegada' style='margin-top: 8px;'>📏 Distancia Total: {total_km:.2f} km</div><div class='llegada'>🏁 Llegada Estimada: {llegada_h:02d}:{llegada_m:02d}</div>{auto_str}</div>"
         res_div.innerHTML = html_out
-
         elev = [p.elevation for p in puntos]
         dists_acum = [0.0]
         for i in range(1, len(puntos)):
             dists_acum.append(dists_acum[-1] + puntos[i-1].distance_2d(puntos[i]) / 1000.0)
-            
         fig, ax = plt.subplots(figsize=(6, 3.8))
         colores = {'subida': '#ef4444', 'bajada': '#10b981', 'llano': '#3b82f6'}
         offset = (max(elev) - min(elev)) * 0.12 
-
         for idx, seg in enumerate(tramos):
             inicio, fin = seg['start_point_index'], seg['end_point_index']
             ax.plot(dists_acum[inicio:fin+1], elev[inicio:fin+1], color=colores[seg['type']], linewidth=2)
-            
             medio_idx = (inicio + fin) // 2
-            ax.text(dists_acum[medio_idx], elev[medio_idx] + offset, str(idx + 1), 
-                    color='white', fontsize=8, fontweight='bold', ha='center', va='bottom',
-                    bbox=dict(boxstyle='circle,pad=0.25', fc='#111827', ec='none', alpha=0.85))
-
+            ax.text(dists_acum[medio_idx], elev[medio_idx] + offset, str(idx + 1), color='white', fontsize=8, fontweight='bold', ha='center', va='bottom', bbox=dict(boxstyle='circle,pad=0.25', fc='#111827', ec='none', alpha=0.85))
         ax.fill_between(dists_acum, elev, color='#f8fafc', alpha=1)
         ax.set_xlabel("Distancia (km)", fontsize=8, color='#6b7280', fontweight='bold')
         ax.set_ylabel("Elevación (m)", fontsize=8, color='#6b7280', fontweight='bold')
@@ -694,26 +765,19 @@ async def procesar(event):
         ax.spines['left'].set_color('#e5e7eb')
         ax.grid(True, linestyle='--', alpha=0.5, color='#d1d5db')
         plt.tight_layout(pad=1.0)
-        
         graf_div.style.display = "block"
         display(fig, target="grafica")
-        
         buf = io.BytesIO()
         fig.savefig(buf, format="png", bbox_inches="tight", dpi=150)
         buf.seek(0)
         window.imagenGeneradaBase64 = base64.b64encode(buf.read()).decode('utf-8')
         btn_down.style.display = "flex"
-        
         plt.close(fig)
-
     except Exception as e:
         res_div.innerHTML = f"<div style='color:#dc2626; text-align:center; padding:12px; background:#fef2f2; border-radius:10px; border:1px solid #fecaca; font-weight:600;'>⚠️ Error en el archivo GPX: {str(e)}</div>"
-    
     finally:
         loading.style.display = "none"
         btn.disabled = False
-
 </script>
 </body>
-
 </html>
